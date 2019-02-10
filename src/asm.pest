@@ -1,0 +1,109 @@
+File = _{
+	SOI ~ (Line ~ NEWLINE)* ~ Line? ~ EOI
+}
+Line = _{
+	Label*
+    ~ (Literal | InstructionNoArg | InstructionWithArg)?
+	~ Comment?
+}
+Label = ${
+	Name ~ ","
+}
+Literal = {
+	( ^"Dec" ~ DecLiteral)
+    | ^"Hex" ~ HexLiteral
+    | ^"Lbl" ~ LblLiteral
+}
+DecLiteral = @{
+	ASCII_DIGIT{1,5}
+}
+HexLiteral = @{
+	ASCII_HEX_DIGIT{1,4}
+}
+LblLiteral = @{
+    Name
+}
+InstructionNoArg = {
+	  Clear
+	| Input
+	| Output
+	| Halt
+	| Breakpoint // Invalid instruction 0xF000
+}
+Clear = {
+    ^"Clear"
+}
+Input = {
+    ^"Input"
+}
+Output = {
+    ^"Output"
+}
+Halt = {
+    ^"Halt"
+}
+Breakpoint = {
+    ^"Breakpoint"
+}
+InstructionWithArg = {
+	(Add
+    |Subt
+    |AddI
+    |Load
+    |Store
+    |Jump
+    |Skipcond
+    |JnS
+    |JumpI
+    |StoreI
+    |LoadI
+    ) ~ (Address | Name)
+}
+Add = {
+    ^"Add"
+}
+Subt = {
+    ^"Subt"
+}
+AddI = {
+    ^"AddI"
+}
+Load = {
+    ^"Load"
+}
+Store = {
+    ^"Store"
+}
+Jump = {
+    ^"Jump"
+}
+Skipcond = {
+    ^"Skipcond"
+}
+JnS = {
+    ^"JnS"
+}
+JumpI = {
+    ^"JumpI"
+}
+StoreI = {
+    ^"StoreI"
+}
+LoadI = {
+    ^"LoadI"
+}
+
+Comment = _{
+	"/" ~ (!NEWLINE ~ ANY)*
+}
+
+Address = @{
+	ASCII_HEX_DIGIT{1,3}
+}
+
+Name = @{
+	ASCII_ALPHA ~ ASCII_ALPHANUMERIC*
+}
+WHITESPACE = _{
+	SPACE_SEPARATOR
+}

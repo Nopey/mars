@@ -1,0 +1,12 @@
+[package]
+name = "mars"
+description = "MARIE Assembler"
+version = "0.1.0"
+authors = ["Magnus Larsen <golgothasTerror101@gmail.com>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+pest = "2.0"
+pest_derive = "2.0"
+error-chain = "0.12"
