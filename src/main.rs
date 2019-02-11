@@ -262,8 +262,17 @@ fn main() {
         //.level_for("blah", log::LevelFilter::Warn)
         .chain(std::io::stdout())
         .apply().expect("Could not initialize fern logger");
-    let unparsed_file = fs::read_to_string("heap6.mas").expect("cannot read file");
-    let binary = assemble(&unparsed_file);
-    debug!("{:04X?}", binary);
-    run_program(binary, true);
+
+    const FILENAMES: [&str; 3] = [
+        "multiply.mas",
+        "heap5.mas",
+        "heap6.mas",
+    ];
+    for filename in FILENAMES.iter(){
+        info!("Parsing and interpreting {:?}", filename);
+        let unparsed_file = fs::read_to_string(filename).expect("cannot read file");
+        let binary = assemble(&unparsed_file);
+        debug!("{:04X?}", binary);
+        run_program(binary, true);
+    }
 }

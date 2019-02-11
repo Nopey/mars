@@ -2,7 +2,7 @@
 name = "mars"
 description = "MARIE Assembler"
 version = "0.1.0"
-authors = ["Magnus Larsen <golgothasTerror101@gmail.com>"]
+authors = ["Magnus Larsen <imjustagan@gmail.com>"]
 edition = "2018"
 publish = false
 
