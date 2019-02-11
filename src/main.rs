@@ -5,6 +5,9 @@ use std::io::stdin;
 use std::collections::hash_map::*;
 use enum_primitive::*;
 
+#[allow(unused_imports)]
+use log::{debug, error, info, trace, warn};
+
 const NOP_MASK : u16 = 0xFFFF;
 const INSTRUCTION_MASK : u16 = 0xF000;
 const ARGUMENT_MASK : u16 = 0x0FFF;
@@ -128,7 +131,7 @@ fn assemble(unparsed_file: &str) -> Vec<u16>{
                                     *a = (*a & INSTRUCTION_MASK) + if *a==0 {far} else {local};
                                 }
                             }
-                            Label::Linked(addr) => eprintln!("Warning: Label defined twice! label {:?}, defined at {:04X}, already defined at {:04X}", label_name, binary.len() as u16, addr) // DoubleLabel
+                            Label::Linked(addr) => warn!("Label defined twice! label {:?}, defined at {:04X}, already defined at {:04X}", label_name, binary.len() as u16, addr) // DoubleLabel
                         }
                         occupied.insert(Label::Linked(binary.len() as u16));
                     },
@@ -145,7 +148,7 @@ fn assemble(unparsed_file: &str) -> Vec<u16>{
         match label{
             Label::Linked(_) => (),
             Label::Unlinked(list) => {
-                eprintln!("Warning: Undefined Label {:?}, referenced in byte(s) {:04X?}", name, list)
+                warn!("Undefined Label {:?}, referenced in byte(s) {:04X?}", name, list)
             }
         }
     }
@@ -161,11 +164,11 @@ fn run_program(mut memory: Vec<u16>, extended_mode: bool){
     loop{
         let instruction = memory[program_counter as usize];
         let argument = instruction & ARGUMENT_MASK;
-        println!("PC: {:03X}, INST: {:04X}", program_counter, instruction);
+        trace!("PC: {:03X}, INST: {:04X}", program_counter, instruction);
         program_counter += 1;
         match Instruction::from_u16(instruction>>12).unwrap(){
             Instruction::JnS     =>{// Operand
-                println!("JnS to {:03X} from {:04X}", argument, program_counter);
+                trace!("JnS to {:03X} from {:04X}", argument, program_counter);
                 memory[argument as usize] = program_counter;
                 program_counter = argument + 1;
             },
@@ -194,7 +197,7 @@ fn run_program(mut memory: Vec<u16>, extended_mode: bool){
                 ];
                 let skipcond = SKIPCOND_MAP[arg as usize];
                 let result = (skipcond[0] != negative) && (skipcond[1] != positive);
-                println!("acc {}, n {}, p {}, arg {} {}, sc {:?}, res {}",
+                trace!("acc {}, n {}, p {}, arg {} {}, sc {:?}, res {}",
                     accumulator,
                     negative,
                     positive,
@@ -208,7 +211,7 @@ fn run_program(mut memory: Vec<u16>, extended_mode: bool){
                 }
             },
             Instruction::Jump    =>{// Operand
-                println!("Jump to {:03X} from {:04X}", argument, program_counter);
+                trace!("Jump to {:03X} from {:04X}", argument, program_counter);
                 program_counter = (program_counter & INSTRUCTION_MASK) + argument;
             },
             Instruction::AddI    =>{// Operand
@@ -217,25 +220,25 @@ fn run_program(mut memory: Vec<u16>, extended_mode: bool){
             },
             Instruction::JumpI   =>{// Operand
                 let addr = indirect_mask & memory[argument as usize];
-                println!("JumpI to {:04X} from {:04X}", addr, program_counter);
+                trace!("JumpI to {:04X} from {:04X}", addr, program_counter);
                 program_counter = addr;
             },
             Instruction::LoadI   =>{// Operand
                 accumulator = memory[memory[argument as usize] as usize];
             },
             Instruction::StoreI  =>{// Operand
-                println!("StoreI {:04X} {:03X} {:04X}", accumulator, argument, memory[argument as usize]);
+                trace!("StoreI {:04X} {:03X} {:04X}", accumulator, argument, memory[argument as usize]);
                 let addr = indirect_mask & memory[argument as usize];
                 memory[addr as usize] = accumulator;
             },
             Instruction::Input   =>{
-                println!("input: ");
+                info!("input: ");
                 let mut buffer = String::new();
                 stdin().read_line(&mut buffer).expect("unable to read from stdin");
                 accumulator = buffer.trim().parse().expect("invalid number from stdin");
             },
             Instruction::Output  =>{
-                println!("Output: {:04X} {}", accumulator, accumulator);
+                info!("Output: {:04X} {}", accumulator, accumulator);
             },
             Instruction::Halt    => return,
             Instruction::Clear   =>{
@@ -247,8 +250,20 @@ fn run_program(mut memory: Vec<u16>, extended_mode: bool){
 }
 
 fn main() {
+    fern::Dispatch::new()
+          .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}] {}",
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        //.level_for("blah", log::LevelFilter::Warn)
+        .chain(std::io::stdout())
+        .apply().expect("Could not initialize fern logger");
     let unparsed_file = fs::read_to_string("heap6.mas").expect("cannot read file");
     let binary = assemble(&unparsed_file);
-    println!("{:04X?}", binary);
+    debug!("{:04X?}", binary);
     run_program(binary, true);
 }
