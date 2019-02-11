@@ -1,4 +1,7 @@
-# Nonstandard Assembler Extensions
+# Mars Extensions for..
+   * [the Assembler](#mars-assembler-extensions)
+   * [the Interpreter](#mars-interpreter-extensions)
+# Mars Assembler Extensions
 ## Compatibility
 MARIE Source will assemble under Mars,
 but Mars Source probably won't assemble under MARIE.
@@ -105,7 +108,7 @@ and allow for flexibility regarding zero.
 Not Equal generates binaries incompatible with MARIE,
 but the Mnemonics are entirely an assembler extension.
 
-# Interpreter Extensions
+# Mars Interpreter Extensions
 *Embrace, Extend, Extinguish.*
 
 ## 16 bit addresses
