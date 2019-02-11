@@ -112,7 +112,6 @@ but the Mnemonics are entirely an assembler extension.
 *Embrace, Extend, Extinguish.*
 
 ## 16 bit addresses
-### (Unimplemented)
 Standard MARIE has 8kB of memory (4096 words)
 
 This extension allows for 128kB of memory (65536 words)
