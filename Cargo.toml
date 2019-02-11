@@ -10,3 +10,4 @@ publish = false
 pest = "2.0"
 pest_derive = "2.0"
 error-chain = "0.12"
+enum_primitive = "0.1"

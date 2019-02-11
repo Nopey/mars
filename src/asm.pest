@@ -46,18 +46,18 @@ Breakpoint = {
     ^"Breakpoint"
 }
 InstructionWithArg = {
-	(Add
+	(AddI
+    |JumpI
+    |StoreI
+    |LoadI
+    |Add
     |Subt
-    |AddI
     |Load
     |Store
     |Jump
     |Skipcond
     |JnS
-    |JumpI
-    |StoreI
-    |LoadI
-    ) ~ (Address | Name)
+    ) ~ (Address ~ &(SPACE_SEPARATOR | NEWLINE) | Name)
 }
 Add = {
     ^"Add"
@@ -102,8 +102,8 @@ Address = @{
 }
 
 Name = @{
-	ASCII_ALPHA ~ ASCII_ALPHANUMERIC*
+	(!NEWLINE ~ !SPACE_SEPARATOR ~ !"," ~ ANY)*
 }
 WHITESPACE = _{
-	SPACE_SEPARATOR
+	SPACE_SEPARATOR | "\t"
 }

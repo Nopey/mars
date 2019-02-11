@@ -1,15 +1,20 @@
 use pest_derive::Parser;
 use pest::Parser;
 use std::fs;
+use std::io::stdin;
 use std::collections::hash_map::*;
+use enum_primitive::*;
 
-const LOCAL_ADDRESS_MASK : u16 = 0x0FFF;
+const NOP_MASK : u16 = 0xFFFF;
 const INSTRUCTION_MASK : u16 = 0xF000;
+const ARGUMENT_MASK : u16 = 0x0FFF;
+const FIRST_NEGATIVE : u16 = 0x8000;
 
 #[derive(Parser)]
 #[grammar = "asm.pest"]
 pub struct ASMParser;
 
+enum_from_primitive! {
 #[derive(Copy, Clone, Debug)]
 enum Instruction{
     JnS     = 0x0,// Operand
@@ -28,6 +33,7 @@ enum Instruction{
     LoadI   = 0xD,// Operand
     StoreI  = 0xE,// Operand
     Invalid = 0xF
+}
 }
 
 #[derive(Debug)]
@@ -75,7 +81,7 @@ fn assemble(unparsed_file: &str) -> Vec<u16>{
                     Rule::Address => u16::from_str_radix(operand.as_str(),16).unwrap(),
                     _ => unreachable!()
                 };
-                let output = ((instruction as u16) << 12) + (address & LOCAL_ADDRESS_MASK);
+                let output = ((instruction as u16) << 12) + (address & ARGUMENT_MASK);
                 binary.push(output);
             },
             Rule::InstructionNoArg =>{
@@ -116,7 +122,7 @@ fn assemble(unparsed_file: &str) -> Vec<u16>{
                         match occupied.get(){
                             Label::Unlinked(addresses) => {
                                 let far = binary.len() as u16;
-                                let local = far & LOCAL_ADDRESS_MASK;
+                                let local = far & ARGUMENT_MASK;
                                 for &addr in addresses {
                                     let a = &mut binary[addr as usize];
                                     *a = (*a & INSTRUCTION_MASK) + if *a==0 {far} else {local};
@@ -146,8 +152,103 @@ fn assemble(unparsed_file: &str) -> Vec<u16>{
     binary
 }
 
+fn run_program(mut memory: Vec<u16>, extended_mode: bool){
+    let mut accumulator = 0;
+    let mut program_counter : u16 = 0;
+    let indirect_mask = if extended_mode {NOP_MASK} else {ARGUMENT_MASK};
+    let full_address_length = if extended_mode {16} else {12};
+    memory.resize(1<<full_address_length, 0);
+    loop{
+        let instruction = memory[program_counter as usize];
+        let argument = instruction & ARGUMENT_MASK;
+        println!("PC: {:03X}, INST: {:04X}", program_counter, instruction);
+        program_counter += 1;
+        match Instruction::from_u16(instruction>>12).unwrap(){
+            Instruction::JnS     =>{// Operand
+                println!("JnS to {:03X} from {:04X}", argument, program_counter);
+                memory[argument as usize] = program_counter;
+                program_counter = argument + 1;
+            },
+            Instruction::Load    =>{// Operand
+                accumulator = memory[argument as usize];
+            },
+            Instruction::Store   =>{// Operand
+                memory[argument as usize] = accumulator;
+            },
+            Instruction::Add     =>{// Operand
+                accumulator = accumulator.wrapping_add(memory[argument as usize]);
+            },
+            Instruction::Subt    =>{// Operand
+                accumulator = accumulator.wrapping_sub(memory[argument as usize]);
+            },
+            Instruction::Skipcond=>{// Operand
+                let negative : bool = accumulator.wrapping_sub(1) > FIRST_NEGATIVE;
+                let positive : bool = accumulator < FIRST_NEGATIVE;
+                let arg = argument >> 10;
+                const SKIPCOND_MAP : [[bool; 2];4] = [
+                    [false, true],
+                    [false, false],
+                    [true,  false],
+                    [true,  true]
+
+                ];
+                let skipcond = SKIPCOND_MAP[arg as usize];
+                let result = (skipcond[0] != negative) && (skipcond[1] != positive);
+                println!("acc {}, n {}, p {}, arg {} {}, sc {:?}, res {}",
+                    accumulator,
+                    negative,
+                    positive,
+                    argument,
+                    arg,
+                    skipcond,
+                    result
+                );
+                if result{
+                    program_counter += 1
+                }
+            },
+            Instruction::Jump    =>{// Operand
+                println!("Jump to {:03X} from {:04X}", argument, program_counter);
+                program_counter = (program_counter & INSTRUCTION_MASK) + argument;
+            },
+            Instruction::AddI    =>{// Operand
+                let addr = indirect_mask & memory[argument as usize];
+                accumulator = accumulator.wrapping_add(memory[addr as usize]);
+            },
+            Instruction::JumpI   =>{// Operand
+                let addr = indirect_mask & memory[argument as usize];
+                println!("JumpI to {:04X} from {:04X}", addr, program_counter);
+                program_counter = addr;
+            },
+            Instruction::LoadI   =>{// Operand
+                accumulator = memory[memory[argument as usize] as usize];
+            },
+            Instruction::StoreI  =>{// Operand
+                println!("StoreI {:04X} {:03X} {:04X}", accumulator, argument, memory[argument as usize]);
+                let addr = indirect_mask & memory[argument as usize];
+                memory[addr as usize] = accumulator;
+            },
+            Instruction::Input   =>{
+                println!("input: ");
+                let mut buffer = String::new();
+                stdin().read_line(&mut buffer).expect("unable to read from stdin");
+                accumulator = buffer.trim().parse().expect("invalid number from stdin");
+            },
+            Instruction::Output  =>{
+                println!("Output: {:04X} {}", accumulator, accumulator);
+            },
+            Instruction::Halt    => return,
+            Instruction::Clear   =>{
+                accumulator = 0;
+            },
+            Instruction::Invalid => ()
+        }
+    }
+}
+
 fn main() {
-    let unparsed_file = fs::read_to_string("multiply.mas").expect("cannot read file");
+    let unparsed_file = fs::read_to_string("heap6.mas").expect("cannot read file");
     let binary = assemble(&unparsed_file);
-    println!("{:04X?}", binary)
+    println!("{:04X?}", binary);
+    run_program(binary, true);
 }

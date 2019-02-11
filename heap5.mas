@@ -1,0 +1,216 @@
+/! heap.mas
+/ by Magnus Larsen
+
+/ Notes about my programming style in MARIE:
+// Constants are all caps, including Labels.
+// Subroutines begin with the HALT instruction, to remind people to JnS instead of Jump
+// Subroutines' arguments and return values are Sub.val for input and Sub;val for return, or Sub.in;out for both
+// Subroutines' local variables are Sub._val
+
+/! 1. Initialize heap
+/ Make a Node *HEAP_HEAD, that runs until the end of memory (0xFF)
+Load HEAP_HEAD
+Store HEAP_HEAD
+Add ONE
+Store iter
+/ Calculate length of usable memory:
+Load MAX_MEM
+Subt HEAP_HEAD
+/ Add one because ..?
+Add ONE
+StoreI iter
+
+/! 2. Bind a handler for Alloc::OUTOFMEMORY
+Load OOM_HANDLER
+Store Alloc::OUTOFMEMORY
+
+/! 3. Program body
+/ printf(Alloc(available memory + 1))
+Load FIRST_HEAP_SIZE
+Add ONE
+Store Alloc.size
+JnS Alloc
+//Won't happen, because the allocation will fail
+Halt
+
+// OOM_HANDLER is an instruction that'll be copied
+OOM_HANDLER, Jump TRY_AGAIN_BUT_SMALLER
+
+/ printf(Alloc(--size))
+TRY_AGAIN_BUT_SMALLER, Load Alloc.size
+Subt ONE
+Store Alloc.size
+Output
+JnS Alloc
+Output
+
+/ Free
+Store Free.addr
+JnS Free
+
+HALT
+
+/! Variables for top program
+iter, hex 000
+
+/! Constants
+/ Heap is a linked list.
+ONE,		HEX 0001
+MAX_MEM,	HEX 0FFF
+JUMP_VALUE, HEX 9000
+HEAP_HEAD,	JnS HEAP_BEGIN
+HEAP_HEAD_ADDRESS, JnS HEAP_HEAD
+
+/! Other Subroutines
+/ How many words to allocate
+Alloc.size,	HEX 0
+/ Address we return
+Alloc;addr,	HEX 0
+/ Modify Alloc::OUTOFMEMORY to an error handler, if you'd like
+/ Locals
+Alloc._last,HEX 0
+Alloc._size,HEX 0
+/ Subroutine Allocate
+Alloc, HALT
+/ Last = &HEAD
+Load HEAP_HEAD_ADDRESS
+Store Alloc._last
+/ Iter = HEAD
+Load HEAP_HEAD
+Store Alloc;addr
+
+Alloc::LOOP, Add ONE
+Store Alloc._size
+LoadI Alloc._size
+Subt Alloc.size
+Skipcond 000
+	Jump Alloc::SUCCESS
+Load Alloc;addr
+Store Alloc._last
+LoadI Alloc._last
+Store Alloc;addr
+Skipcond 400
+	Jump Alloc::LOOP
+Alloc::OUTOFMEMORY, Halt
+Alloc::SUCCESS, Skipcond 400
+Jump Alloc::SHRINK_NODE
+/ Alloc::DELETE_NODE
+LoadI Alloc;addr
+StoreI Alloc._last
+Clear
+StoreI Alloc._size
+Jump Alloc::PREPARE_NODE
+Alloc::SHRINK_NODE, Load Alloc;addr
+Add Alloc.size
+Add ONE
+StoreI Alloc._last
+Add ONE
+Store Alloc._last
+LoadI Alloc._size
+Subt Alloc.size
+Subt ONE
+StoreI Alloc._last
+Load Alloc._last
+Subt ONE
+Store Alloc._last
+Load Alloc._size
+Subt ONE
+Store Alloc._size
+LoadI Alloc._size
+StoreI Alloc._last
+Alloc::PREPARE_NODE,Load Alloc.size
+StoreI Alloc;addr
+Load Alloc;addr
+Add ONE
+Store Alloc;addr
+JumpI Alloc
+
+/ Address we free
+Free.addr,	HEX 0
+/ Locals
+Free._last,HEX 0
+Free._size,HEX 0
+Free._temp,HEX 0
+/ Subroutine Free
+Free, HALT
+/ Reveal the hidden size from the heap
+Load Free.addr
+Subt ONE
+Store Free.addr
+Load HEAP_HEAD_ADDRESS
+/Store next
+//0. Find our space
+Free::DO, Store Free._last
+LoadI Free._last
+/Store next
+/ If next==NULL || next-current>0, goto Done.
+Skipcond 400
+	Jump Free::DO::NOT_NULL
+Jump Free::DONE
+Free::DO::NOT_NULL, Subt Free.addr
+Skipcond 000
+	Jump Free::DONE
+LoadI Free._last
+Jump Free::DO
+//1. Handle previous
+Free::DONE, Load Free._last
+Add ONE
+Store Free._size
+LoadI Free._size
+Add Free._last
+Subt Free.addr
+Skipcond 400
+	Jump Free::CREATE_NODE
+/ Grow_LAST is like:
+/ last->size += *current
+/ current = last
+LoadI Free.addr
+AddI Free._size
+Add ONE
+StoreI Free._size
+Load Free._last
+Store Free.addr
+Jump Free::HANDLE_NEXT_NODE
+
+/ Free::CREATE_NODE create node at Free.addr is like
+/ current[1] = current[0]
+/ current[0] = next
+/ current->next = last->next
+/ last->next = current
+Free::CREATE_NODE, Load Free.addr
+Add ONE
+Store Free._size
+LoadI Free.addr
+StoreI Free._size
+LoadI Free._last
+StoreI Free.addr
+Load Free.addr
+StoreI Free._last
+
+/2. Handle current->next node
+Free::HANDLE_NEXT_NODE, LoadI Free._size
+Store Free._temp
+LoadI Free._last
+Subt Free._temp
+Subt Free.addr
+Skipcond 400
+	Jump Free::CHAIN
+/ Current->size += 1 + next->size
+LoadI Free._last
+Add ONE
+Store Free._temp
+Load Free._size
+AddI Free._temp
+Add ONE
+Store Free._size
+/ current->next = next->next
+Load Free.addr
+Add ONE
+Store Free._temp
+Load Free._size
+StoreI Free._temp
+Free::CHAIN,JumpI Free
+HEAP_BEGIN, dec 0
+FIRST_HEAP_SIZE, dec 0
+
+
